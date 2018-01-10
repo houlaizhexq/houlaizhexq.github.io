@@ -1,0 +1,198 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  <title>MySQL安全运维 | 后来者</title>
+
+  
+  <meta name="author" content="后来者xq">
+  
+
+  
+  <meta name="description" content="简单介绍一些MySQL安全运维各方面配置。">
+  
+
+  
+  
+  <meta name="keywords" content="MySQL,安全运维,数据库加固">
+  
+
+  <meta id="viewport" name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, minimal-ui">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+
+  <meta property="og:title" content="MySQL安全运维"/>
+
+  <meta property="og:site_name" content="后来者"/>
+
+  
+  <meta property="og:image" content="/favicon.ico"/>
+  
+
+  <link href="/favicon.ico" rel="icon">
+  <link rel="alternate" href="/atom.xml" title="后来者" type="application/atom+xml">
+  <link rel="stylesheet" href="/css/style.css" media="screen" type="text/css">
+</head>
+
+
+<body>
+<div class="blog">
+  <div class="content">
+
+    <header>
+  <div class="site-branding">
+    <h1 class="site-title">
+      <a href="/">后来者</a>
+    </h1>
+    <p class="site-description"></p>
+  </div>
+  <nav class="site-navigation">
+    <ul>
+      
+        <li><a href="/">主页</a></li>
+      
+        <li><a href="/categories/生活">生活</a></li>
+      
+        <li><a href="/categories/安全">安全</a></li>
+      
+        <li><a href="/archives">归档</a></li>
+      
+        <li><a href="/music">音乐</a></li>
+      
+        <li><a href="http://weibo.com/xqsinchi">微博</a></li>
+      
+    </ul>
+  </nav>
+</header>
+
+    <main class="site-main posts-loop">
+    <article>
+
+  
+    
+    <h3 class="article-title"><span>MySQL安全运维</span></h3>
+    
+  
+
+  <div class="article-top-meta">
+    <span class="posted-on">
+      <a href="/2017/05/03/MySQL安全运维/" rel="bookmark">
+        <time class="entry-date published" datetime="2017-05-02T16:57:34.000Z">
+          2017-05-03
+        </time>
+      </a>
+    </span>
+  </div>
+
+
+  
+
+  <div class="article-content">
+    <div class="entry">
+      
+        <p><img src="http://okbz5q4n2.bkt.clouddn.com/1200px-MySQL.svg.png" alt="MySQL"></p>
+<p>简单介绍一些MySQL安全运维各方面配置。<br><a id="more"></a></p>
+<h2 id="账号"><a href="#账号" class="headerlink" title="账号"></a>账号</h2><p>MySQL用户分为两部分host以及user两部分。样式如下：<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">+-----------+----------+-</span><br><span class="line">| Host      | User     | ...</span><br><span class="line">+-----------+----------+-</span><br><span class="line">| %         | root     | ...</span><br><span class="line">| %         | jeffrey  | ...</span><br><span class="line">| localhost | root     | ...</span><br><span class="line">| localhost |          | ...</span><br><span class="line">| %         |          | ...</span><br><span class="line">+-----------+----------+-</span><br></pre></td></tr></table></figure></p>
+<p>一些解释：</p>
+<ol>
+<li>两个root账户不是同一个root账户；</li>
+<li><p>MySQL将此表读入内存时候，是按照host到user顺序，按照从具体到模糊排序的，所以内存中如下形式：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">+-----------+----------+-</span><br><span class="line">| Host      | User     | </span><br><span class="line">+-----------+----------+-</span><br><span class="line">| localhost | root     | </span><br><span class="line">| localhost |          | </span><br><span class="line">| %         | jeffrey  | </span><br><span class="line">| %         | root     | </span><br><span class="line">| %         |          |</span><br><span class="line">+-----------+----------+-</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>MySQL在认证账户时候，匹配到第一个时候就认为认证成功，因此，假如，来自客户端的用户为（””,root），则””匹配第一行成功，root也匹配成功，因此，（””,root）匹配第一行。</p>
+</li>
+<li>假如用户为（””,jeffrey）,同理，按照顺序””匹配到任意一行，但是jeffrey只能匹配到第三行，因此，总体匹配第三行。</li>
+<li>加入用户为（192.168.2.3,root）,按顺序，192.168.2.3匹配到第三第四行，root匹配到第四行，总体匹配第四行。</li>
+<li>（%，）账户为匿名账户，可以在任何终端不输入用户名登录。</li>
+</ol>
+<h2 id="口令策略"><a href="#口令策略" class="headerlink" title="口令策略"></a>口令策略</h2><p>使用validate_password插件，修改如下参数：<br>validate-password=ON/OFF/FORCE/FORCE_PLUS_PERMANENT: 决定是否使用该插件(及强制/永久强制使用)。<br>validate_password_dictionary_file：插件用于验证密码强度的字典文件路径。<br>validate_password_length：密码最小长度。<br>validate_password_mixed_case_count：密码至少要包含的小写字母个数和大写字母个数。<br>validate_password_number_count：密码至少要包含的数字个数。<br>validate_password_policy：密码强度检查等级，0/LOW、1/MEDIUM、2/STRONG。<br>validate_password_special_char_count：密码至少要包含的特殊字符数。</p>
+<h2 id="审计"><a href="#审计" class="headerlink" title="审计"></a>审计</h2><p>使用第三方审计模块：MariaDB，mcafee<br>使用企业版本MySQL</p>
+<h2 id="加密连接"><a href="#加密连接" class="headerlink" title="加密连接"></a>加密连接</h2><p>修改变量，启用ssl：<br>have_openssl = YES<br>have_ssl = YES<br>如果为NO，则说明当前MySQL不支持ssl，需要重新安装MySQL；如果为disabled，则说明仅仅关闭ssl，修改为yes即可。<br>然后经过一系列配置证书的过程。</p>
+<h2 id="资源限制"><a href="#资源限制" class="headerlink" title="资源限制"></a>资源限制</h2><h3 id="超时时间"><a href="#超时时间" class="headerlink" title="超时时间"></a>超时时间</h3><p>connect_timeout ， 三次握手超时时间，默认10秒<br>interactive_timeout ， 交互式访问超时时间，例如shell访问方式，默认28800秒<br>wait_timeout ， 非交互式访问超时时间，例如jdbc访问方式，默认28800秒<br>net_read_timeout ， 数据库访问数据网络超时时间，默认30秒<br>net_write_timeout ， 数据库写数据网络超时时间，默认3秒</p>
+<h3 id="连接限制"><a href="#连接限制" class="headerlink" title="连接限制"></a>连接限制</h3><p>MAX_QUERIES_PER_HOUR ， 限制每小时执行查询SQL语句数目<br>MAX_UPDATES_PER_HOUR ， 限制每小时更细数据SQL语句条数<br>MAX_CONNECTIONS_PER_HOUR ， 限制每小时最大的联接数是多少<br>MAX_USER_CONNECTIONS ， 限制单个用户最大并发连接数<br>MAX_CONNECTIONS ， 限制全部用户最大连并发连接数目</p>
+
+      
+    </div>
+
+  </div>
+
+  <div class="article-footer">
+    <div class="article-meta pull-left">
+
+    
+      
+
+    <span class="post-categories">
+      <i class="icon-categories"></i>
+        <a href="/categories/安全/">安全</a>
+    </span>
+    
+
+    
+    
+
+    <span class="post-tags">
+      <i class="icon-tags"></i>
+        <a href="/tags/MySQL/">MySQL</a><a href="/tags/安全运维/">安全运维</a><a href="/tags/数据库加固/">数据库加固</a>
+    </span>
+    
+
+    </div>
+	
+	
+	
+  </div>
+</article>
+
+
+
+<!-- JiaThis Button BEGIN -->
+<div class="jiathis_style_24x24">
+	<a class="jiathis_button_tsina"></a>
+	<a class="jiathis_button_weixin"></a>
+	<a class="jiathis_button_qzone"></a>
+	<a class="jiathis_button_fb"></a>
+	<a class="jiathis_button_twitter"></a>
+	<a class="jiathis_button_googleplus"></a>
+	<a class="jiathis_button_evernote"></a>
+	<a class="jiathis_button_tqq"></a>
+	<a href="http://www.jiathis.com/share?uid=2128935" class="jiathis jiathis_txt jtico jtico_jiathis" target="_blank"></a>
+	<a class="jiathis_counter_style"></a>
+</div>
+<script type="text/javascript">
+var jiathis_config = {data_track_clickback:'true'};
+</script>
+<script type="text/javascript" src="http://v3.jiathis.com/code/jia.js?uid=2128935" charset="utf-8"></script>
+<!-- JiaThis Button END -->
+	
+	<br>
+	<br>
+	<br>
+	<br>
+	
+	<!-- UY BEGIN -->
+	<div id="uyan_frame"></div>
+	<script type="text/javascript" src="http://v2.uyan.cc/code/uyan.js?uid=2128935"></script>
+	<!-- UY END -->
+  
+
+
+    </main>
+
+    <footer class="site-footer">
+  <p class="site-info">
+    Proudly powered by <a href="https://hexo.io/" target="_blank">Hexo</a> and
+    Theme by <a href="https://github.com/CodeDaraW/Hacker" target="_blank">Hacker</a>
+    </br>
+    
+    &copy; 2018 后来者xq
+    
+	&ensp;&ensp;
+	<script type="text/javascript">var cnzz_protocol = (("https:" == document.location.protocol) ? " https://" : " http://");document.write(unescape("%3Cspan id='cnzz_stat_icon_1261602584'%3E%3C/span%3E%3Cscript src='" + cnzz_protocol + "s95.cnzz.com/z_stat.php%3Fid%3D1261602584%26show%3Dpic1' type='text/javascript'%3E%3C/script%3E"));</script>
+  </p>
+</footer>
+  </div>
+</div>
+</body>
+</html>
